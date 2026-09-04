@@ -21,14 +21,15 @@ jobs:
       - run: npm install
       - run: npx playwright install --with-deps chromium
       - run: npm run update-feed
-      - name: Commit refreshed feed
+      - run: node scripts/update-division-feed.mjs
+      - name: Commit refreshed feeds
         run: |
-          if git diff --quiet -- feed.xml status.json; then
+          if git diff --quiet -- feed.xml division-feed.xml status.json division-status.json; then
             echo "No feed changes"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add feed.xml status.json
-          git commit -m "Refresh tournament RSS feed"
+          git add feed.xml division-feed.xml status.json division-status.json
+          git commit -m "Refresh tournament RSS feeds"
           git push
