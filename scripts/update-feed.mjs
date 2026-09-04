@@ -8,7 +8,7 @@ const TZ = 'America/New_York';
 
 const seeded = [
   { id:'seed-1', status:'scheduled', opponent:'Carrollton School JV Team', time:'Fri 3:00 PM', court:'Fuchs Ct. 5', teamSets:null, opponentSets:null, setScores:[] },
-  { id:'seed-2', status:'scheduled', opponent:"Goleman Girls\' JV", time:'Fri 5:00 PM', court:'Fuchs Ct. 5', teamSets:null, opponentSets:null, setScores:[] },
+  { id:'seed-2', status:'scheduled', opponent:"Goleman Girls' JV", time:'Fri 5:00 PM', court:'Fuchs Ct. 5', teamSets:null, opponentSets:null, setScores:[] },
   { id:'seed-3', status:'scheduled', opponent:'Riviera Prep JV', time:'Fri 8:00 PM', court:'Fuchs Ct. 5', teamSets:null, opponentSets:null, setScores:[] }
 ];
 
@@ -26,9 +26,7 @@ try {
       if (!/(json|javascript|text|graphql)/.test(ct)) return;
       const text = await resp.text();
       if (!text || text.length > 5_000_000) return;
-      if (normalize(text).includes(teamNorm)) {
-        candidates.push({ url: resp.url(), contentType: ct, text });
-      }
+      if (normalize(text).includes(teamNorm)) candidates.push({ url: resp.url(), contentType: ct, text });
     } catch {}
   });
 
@@ -138,33 +136,64 @@ function normalizeJson(data) {
   return dedupe(out);
 }
 
+// OTTO renders each schedule row as three team names followed by the time/court:
+// participant 1, participant 2, then the officiating/referee team in italics.
+// Only the first two names are match participants. This avoids treating a
+// Mavericks referee assignment as a Mavericks match.
 function parseVisibleText(text) {
   const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const poolTeams = ['Lady Mavericks Fr', 'Carrollton School JV Team', "Goleman Girls' JV", 'Riviera Prep JV'];
   const out = [];
-  const knownOpponents = ['Carrollton School JV Team', "Goleman Girls' JV", 'Riviera Prep JV'];
-  for (const opponent of knownOpponents) {
-    const idxs = lines.map((x,i)=>same(x,opponent)?i:-1).filter(i=>i>=0);
-    for (const i of idxs) {
-      const window = lines.slice(Math.max(0,i-5), Math.min(lines.length,i+8));
-      if (!window.some(x => normalize(x).includes(teamNorm))) continue;
-      const joined = window.join(' | ');
-      const scorePair = joined.match(/(?:^|\D)([0-3])\s*[-–:]\s*([0-3])(?:\D|$)/);
-      const time = window.find(x => /\b\d{1,2}:\d{2}\s*(?:AM|PM)\b/i.test(x)) || '';
-      const court = window.find(x => /\b(?:ct\.?|court)\s*\d+\b/i.test(x)) || '';
-      const finalish = /final|complete|completed/i.test(joined) || (scorePair && Math.max(Number(scorePair[1]), Number(scorePair[2])) >= 2);
-      out.push({
-        id: `text-${normalize(opponent)}-${i}`,
-        status: finalish ? 'final' : 'scheduled',
-        opponent,
-        time,
-        court,
-        teamSets: scorePair ? Number(scorePair[1]) : null,
-        opponentSets: scorePair ? Number(scorePair[2]) : null,
-        setScores: []
-      });
+
+  for (let i = 0; i < lines.length; i++) {
+    if (!/\b(?:Fri\s+)?\d{1,2}:\d{2}\s*(?:AM|PM)\b/i.test(lines[i])) continue;
+
+    // Collect up to the three closest recognized pool-team lines preceding the time.
+    const names = [];
+    for (let j = i - 1; j >= 0 && j >= i - 7; j--) {
+      const found = poolTeams.find(t => same(lines[j], t));
+      if (found) names.unshift(found);
+      if (names.length === 3) break;
     }
+    if (names.length < 2) continue;
+
+    // In OTTO schedule rows the first two are playing; an optional third is the ref team.
+    const participants = names.slice(0, 2);
+    if (!participants.some(t => same(t, TEAM))) continue;
+    const opponent = participants.find(t => !same(t, TEAM));
+    if (!opponent) continue;
+
+    const forward = lines.slice(i, Math.min(lines.length, i + 4));
+    const courtLine = forward.find(x => /\b(?:ct\.?|court)\s*\.?\s*\d+\b/i.test(x)) || '';
+    const scoreWindow = lines.slice(Math.max(0, i - 5), Math.min(lines.length, i + 4)).join(' | ');
+    const scorePair = scoreWindow.match(/(?:^|\D)([0-3])\s*[-–:]\s*([0-3])(?:\D|$)/);
+    const finalish = /final|complete|completed/i.test(scoreWindow) || (scorePair && Math.max(Number(scorePair[1]), Number(scorePair[2])) >= 2);
+
+    out.push({
+      id: `row-${normalize(opponent)}-${normalize(lines[i])}`,
+      status: finalish ? 'final' : 'scheduled',
+      opponent,
+      time: lines[i].replace(/^Starts\s+/i,'').replace(/,$/,''),
+      court: cleanVisibleCourt(courtLine),
+      teamSets: scorePair ? Number(scorePair[1]) : null,
+      opponentSets: scorePair ? Number(scorePair[2]) : null,
+      setScores: []
+    });
   }
-  return dedupe(out);
+
+  // Prefer the known correct pool schedule if the rendered page was ambiguous.
+  const byOpponent = new Map(out.map(m => [normalize(m.opponent), m]));
+  const merged = seeded.map(s => {
+    const live = byOpponent.get(normalize(s.opponent));
+    if (!live) return s;
+    return {
+      ...s,
+      ...live,
+      time: live.time || s.time,
+      court: live.court || s.court
+    };
+  });
+  return merged;
 }
 
 function extractSets(obj, teamIsA) {
@@ -200,6 +229,7 @@ function normalize(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/
 function same(a,b) { const x=normalize(a), y=normalize(b); return x===y || x.includes(y) || y.includes(x); }
 function numberish(v) { if (v == null || v === '') return null; const n=Number(v); return Number.isFinite(n) ? n : null; }
 function cleanCourt(v) { if (!v) return ''; if (typeof v === 'object') return String(v.name || v.label || v.title || ''); return String(v); }
+function cleanVisibleCourt(v) { return String(v || '').replace(/^Fuchs\s+/i,'Fuchs ').replace(/Ct\.?\s*Ct\.?/i,'Ct.').replace(/Ct\.?\s*(\d+)/i,'Ct. $1'); }
 function humanTime(v) { if (!v) return ''; const s=String(v); const d=new Date(s); if (!Number.isNaN(d.getTime()) && /\d{4}-\d{2}-\d{2}/.test(s)) return new Intl.DateTimeFormat('en-US',{weekday:'short',hour:'numeric',minute:'2-digit',timeZone:TZ}).format(d); return s; }
 function walk(v, fn) { if (!v || typeof v !== 'object') return; fn(v); if (Array.isArray(v)) for (const x of v) walk(x,fn); else for (const x of Object.values(v)) walk(x,fn); }
 function xml(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;'); }
