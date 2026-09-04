@@ -4,6 +4,8 @@ import fs from 'node:fs/promises';
 const EVENT_URL = 'https://events.ottoevent.ai/event/fea42fc5d/divisions/27635/pool-bracket?pbTabId=cb0e590a-d91a-4d67-8c37-a137c20c9ca0&pbId=78dc27fa-9b59-425b-a5d1-bcd740a7414e';
 const EVENT = '2026 Tri-County High School Championships';
 const TEAMS = ['Lady Mavericks Fr','Carrollton School JV Team',"Goleman Girls' JV",'Riviera Prep JV'];
+const EVENT_DATES = { Fri:'2026-09-04', Sat:'2026-09-05' };
+const ET_OFFSET = '-04:00';
 const norm = s => String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 const same = (a,b) => { const x=norm(a), y=norm(b); return x===y || x.includes(y) || y.includes(x); };
 const canonical = n => TEAMS.find(t=>same(t,n)) || String(n||'');
@@ -120,14 +122,76 @@ function fallback(){
 }
 
 function rss(games,now){
-  const items=[...games].sort((a,b)=>rank(a)-rank(b)||String(a.time).localeCompare(String(b.time))).map((g,i)=>{
-    let title=g.status==='final'?`FINAL: ${g.team} ${score(g.teamSets)}-${score(g.opponentSets)} ${g.opponent}`:g.status==='live'?`LIVE: ${g.team} ${score(g.teamSets)}-${score(g.opponentSets)} ${g.opponent}`:`NEXT: ${g.team} vs ${g.opponent}`;
-    const desc=[g.time,g.court,g.setScores?.length?`Sets: ${g.setScores.join(', ')}`:''].filter(Boolean).join(' • ');
-    return `<item><title>${esc(title)}</title><description>${esc(desc)}</description><guid isPermaLink="false">${esc(g.id||String(i))}</guid><link>${esc(EVENT_URL)}</link><pubDate>${now.toUTCString()}</pubDate></item>`;
-  }).join('');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>${esc(EVENT)} Division Scores</title><link>${esc(EVENT_URL)}</link><description>All scheduled games and updated scores for the selected division pool</description><lastBuildDate>${now.toUTCString()}</lastBuildDate>${items}</channel></rss>\n`;
+  const enriched=games.map(g=>({...g,startAt:scheduledDate(g.time)}));
+  const upcomingStarts=enriched
+    .filter(g=>g.status!=='final' && g.status!=='live' && g.startAt && g.startAt>now)
+    .map(g=>g.startAt.getTime());
+  const nextStart=upcomingStarts.length ? Math.min(...upcomingStarts) : null;
+
+  const items=enriched
+    .map(g=>({...g,displayState:displayState(g,now,nextStart)}))
+    .sort((a,b)=>displayRank(a)-displayRank(b)||(a.startAt?.getTime()||Number.MAX_SAFE_INTEGER)-(b.startAt?.getTime()||Number.MAX_SAFE_INTEGER))
+    .map((g,i)=>{
+      let title;
+      if(g.status==='final'){
+        title=`FINAL: ${g.team} ${score(g.teamSets)}-${score(g.opponentSets)} ${g.opponent}`;
+      } else if(g.displayState==='now'){
+        title=(Number.isFinite(g.teamSets)||Number.isFinite(g.opponentSets))
+          ? `NOW PLAYING: ${g.team} ${score(g.teamSets)}-${score(g.opponentSets)} ${g.opponent}`
+          : `NOW PLAYING: ${g.team} vs ${g.opponent}`;
+      } else if(g.displayState==='upnext'){
+        title=`UP NEXT: ${g.team} vs ${g.opponent}`;
+      } else {
+        title=`${displayTime(g.time)}: ${g.team} vs ${g.opponent}`;
+      }
+
+      const desc=[g.court,g.status==='final'&&g.time?`Started ${displayTime(g.time)}`:'',g.displayState==='now'&&g.time?`Scheduled ${displayTime(g.time)}`:'',g.setScores?.length?`Sets: ${g.setScores.join(', ')}`:''].filter(Boolean).join(' • ');
+      return `<item><title>${esc(title)}</title><description>${esc(desc)}</description><guid isPermaLink="false">${esc(g.id||String(i))}-${esc(g.displayState)}</guid><link>${esc(EVENT_URL)}</link><pubDate>${now.toUTCString()}</pubDate></item>`;
+    }).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>${esc(EVENT)} Division Scores</title><link>${esc(EVENT_URL)}</link><description>Time-aware division schedule and updated scores</description><lastBuildDate>${now.toUTCString()}</lastBuildDate><ttl>2</ttl>${items}</channel></rss>\n`;
 }
 
+function displayState(g,now,nextStart){
+  if(g.status==='final') return 'final';
+  if(g.status==='live') return 'now';
+  if(g.startAt && g.startAt<=now) return 'now';
+  if(g.startAt && nextStart!=null && g.startAt.getTime()===nextStart) return 'upnext';
+  return 'scheduled';
+}
+
+function scheduledDate(label){
+  const s=String(label||'').trim();
+  const m=s.match(/\b(Fri|Sat)\b[^0-9]*(\d{1,2}):(\d{2})\s*(AM|PM)\b/i) || s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if(!m) return null;
+
+  let day,hour,minute,ampm;
+  if(m.length===5){
+    day=cap(m[1]); hour=+m[2]; minute=+m[3]; ampm=m[4].toUpperCase();
+  } else {
+    day='Fri'; hour=+m[1]; minute=+m[2]; ampm=m[3].toUpperCase();
+  }
+  if(ampm==='PM'&&hour!==12) hour+=12;
+  if(ampm==='AM'&&hour===12) hour=0;
+  const date=EVENT_DATES[day];
+  if(!date) return null;
+  return new Date(`${date}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00${ET_OFFSET}`);
+}
+
+function displayTime(label){
+  const s=String(label||'').trim();
+  const m=s.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+  return m ? m[1].replace(/\s+/g,' ').toUpperCase() : s;
+}
+
+function displayRank(g){
+  if(g.displayState==='now') return 0;
+  if(g.displayState==='upnext') return 1;
+  if(g.displayState==='scheduled') return 2;
+  return 3;
+}
+
+function cap(s){return String(s||'').slice(0,1).toUpperCase()+String(s||'').slice(1,3).toLowerCase();}
 function sets(o){
   const a=first(o,['sets','setScores','games','gameScores','setResults']);
   if(!Array.isArray(a)) return [];
@@ -137,5 +201,4 @@ function walk(v,fn){if(!v||typeof v!=='object')return;fn(v);if(Array.isArray(v))
 function fmtTime(v){if(!v)return'';const s=String(v),d=new Date(s);if(!Number.isNaN(d.getTime())&&/\d{4}-\d{2}-\d{2}/.test(s))return new Intl.DateTimeFormat('en-US',{weekday:'short',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}).format(d);return s;}
 function pairKey(g){return[norm(g.team),norm(g.opponent)].sort().join('|');}
 function dedupe(a){const s=new Set(),o=[];for(const g of a){const k=pairKey(g)+'|'+norm(g.time);if(!s.has(k)){s.add(k);o.push(g);}}return o;}
-function rank(g){return g.status==='live'?0:g.status==='final'?1:2;}
 function score(v){return Number.isFinite(v)?String(v):'?';}
