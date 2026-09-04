@@ -6,7 +6,7 @@
   "source": "rendered-page",
   "matchedUrl": null,
   "note": "Parsed 3 Lady Mavericks match(es) from rendered-page.",
-  "generatedAt": "2026-09-04T22:18:42.414Z",
+  "generatedAt": "2026-09-04T22:29:02.903Z",
   "matches": [
     {
       "id": "seed-1",
@@ -19,7 +19,7 @@
       "setScores": []
     },
     {
-      "id": "row-golemangirlsjv-fri500pm",
+      "id": "seed-2",
       "status": "scheduled",
       "opponent": "Goleman Girls' JV",
       "time": "Fri 5:00 PM",
