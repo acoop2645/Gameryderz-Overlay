@@ -6,7 +6,7 @@
   "source": "rendered-page",
   "matchedUrl": null,
   "note": "Parsed 3 Lady Mavericks match(es) from rendered-page.",
-  "generatedAt": "2026-09-05T01:10:24.728Z",
+  "generatedAt": "2026-09-05T01:31:49.870Z",
   "matches": [
     {
       "id": "seed-1",
@@ -29,7 +29,7 @@
       "setScores": []
     },
     {
-      "id": "row-rivieraprepjv-fri800pm",
+      "id": "seed-3",
       "status": "scheduled",
       "opponent": "Riviera Prep JV",
       "time": "Fri 8:00 PM",
