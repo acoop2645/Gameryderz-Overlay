@@ -2,14 +2,14 @@
   "ok": true,
   "event": "2026 Tri-County High School Championships",
   "eventUrl": "https://events.ottoevent.ai/event/fea42fc5d/divisions/27635/pool-bracket?pbTabId=cb0e590a-d91a-4d67-8c37-a137c20c9ca0&pbId=78dc27fa-9b59-425b-a5d1-bcd740a7414e",
-  "generatedAt": "2026-09-05T14:16:59.113Z",
+  "generatedAt": "2026-09-05T14:27:25.872Z",
   "source": "rendered-page",
   "matchedUrl": null,
   "games": [
     {
-      "id": "page-carrolltonschooljvteam-rivieraprepjv-sat1200pm",
-      "team": "Carrollton School JV Team",
-      "opponent": "Riviera Prep JV",
+      "id": "page-rivieraprepjv-golemangirlsjv-sat1200pm",
+      "team": "Riviera Prep JV",
+      "opponent": "Goleman Girls' JV",
       "time": "Sat 12:00 PM",
       "court": "Fuchs Ct. 7",
       "status": "scheduled",
@@ -23,7 +23,7 @@
       "opponent": "Lady Mavericks Fr",
       "time": "Sat 11:00 AM",
       "court": "Fuchs Ct. 7",
-      "status": "scheduled",
+      "status": "live",
       "teamSets": null,
       "opponentSets": null,
       "setScores": []
