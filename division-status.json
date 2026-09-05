@@ -2,7 +2,7 @@
   "ok": true,
   "event": "2026 Tri-County High School Championships",
   "eventUrl": "https://events.ottoevent.ai/event/fea42fc5d/divisions/27635/pool-bracket?pbTabId=cb0e590a-d91a-4d67-8c37-a137c20c9ca0&pbId=78dc27fa-9b59-425b-a5d1-bcd740a7414e",
-  "generatedAt": "2026-09-05T15:57:51.794Z",
+  "generatedAt": "2026-09-05T16:18:53.715Z",
   "source": "rendered-page",
   "matchedUrl": null,
   "games": [
@@ -18,9 +18,9 @@
       "setScores": []
     },
     {
-      "id": "page-golemangirlsjv-ladymavericksfr-sat1100am",
+      "id": "page-golemangirlsjv-carrolltonschooljvteam-sat1100am",
       "team": "Goleman Girls' JV",
-      "opponent": "Lady Mavericks Fr",
+      "opponent": "Carrollton School JV Team",
       "time": "Sat 11:00 AM",
       "court": "Fuchs Ct. 7",
       "status": "live",
