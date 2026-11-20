@@ -3,10 +3,10 @@
   "event": "2026 Tri-County High School Championships",
   "team": "Lady Mavericks Fr",
   "eventUrl": "https://events.ottoevent.ai/event/fea42fc5d/divisions/27635/pool-bracket?pbTabId=cb0e590a-d91a-4d67-8c37-a137c20c9ca0&pbId=78dc27fa-9b59-425b-a5d1-bcd740a7414e",
-  "source": "rendered-page",
+  "source": "seed",
   "matchedUrl": null,
-  "note": "Parsed 3 Lady Mavericks match(es) from rendered-page.",
-  "generatedAt": "2026-11-20T06:04:03.817Z",
+  "note": "No live OTTO match payload was detected; using the seeded schedule.",
+  "generatedAt": "2026-11-20T15:21:27.030Z",
   "matches": [
     {
       "id": "seed-1",
